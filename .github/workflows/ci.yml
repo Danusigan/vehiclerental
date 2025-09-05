@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-backend:
+    runs-on: ubuntu-latest
+    # Set the default directory for the backend job
+    defaults:
+      run:
+        working-directory: audio/audio
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with: # NEW: Add this 'with' clause for SonarQube
+          fetch-depth: 0  # Shallow clones should be disabled for SonarQube analysis
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # NEW: Add SonarQube package caching step
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      # Your existing build/test step
+      - name: Build and test with Maven
+        run: mvn clean install -Dtest=!*Selenium*,!*UI*,!*SignIn*,!*SignUp*,!*Registration*,!*AudioApplicationTests*
+
+      # NEW: Add the SonarQube analysis step AFTER tests pass
+      - name: Analyze with SonarQube
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # Make sure you add this secret in GitHub repo settings
+        run: mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=shukriahamed44_Project_Audioh
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    # Set the default directory for the frontend job
+    defaults:
+      run:
+        working-directory: audioh-frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies and build
+        run: |
+          npm install
+          npm run build
